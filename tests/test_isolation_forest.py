@@ -3,6 +3,8 @@ import pandas as pd
 import pytest
 
 from ml.training.isolation_forest import fit_isolation_forest, summarize_holdout
+from app.core.public_example import PUBLIC_EXAMPLE_PANEL
+from ml.preprocessing.biopro import FEATURE_METADATA, SELECTED_FEATURES
 
 
 def test_scores_preserve_index_and_expose_missingness() -> None:
@@ -30,3 +32,10 @@ def test_rejects_rows_without_any_observed_feature() -> None:
 
     with pytest.raises(ValueError, match="all features missing"):
         fit_isolation_forest(data)
+
+
+def test_feature_metadata_and_public_example_cover_the_model_panel() -> None:
+    assert set(FEATURE_METADATA) == set(SELECTED_FEATURES)
+    assert set(PUBLIC_EXAMPLE_PANEL) == set(SELECTED_FEATURES)
+    assert FEATURE_METADATA["LBDSCRSI"]["name"] == "Creatinina"
+    assert FEATURE_METADATA["LBDSCRSI"]["unit"] == "µmol/L"
