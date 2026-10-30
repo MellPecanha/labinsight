@@ -10,34 +10,18 @@ from typing import Final
 import httpx
 import streamlit as st
 
+from app.core.public_example import PUBLIC_EXAMPLE_PANEL
+from ml.preprocessing.biopro import FEATURE_METADATA, SELECTED_FEATURES
 
 API_URL: Final = os.getenv("LABINSIGHT_API_URL", "http://127.0.0.1:8000")
 
 FEATURE_GROUPS: Final = {
-    "Painel metabólico": [
-        "LBXSATSI",
-        "LBDSALSI",
-        "LBXSAPSI",
-        "LBXSASSI",
-        "LBXSC3SI",
-        "LBDSBUSI",
-    ],
-    "Função e enzimas": [
-        "LBXSCLSI",
-        "LBDSCRSI",
-        "LBXSGTSI",
-        "LBDSIRSI",
-        "LBXMAGN",
-        "LBDSPHSI",
-    ],
-    "Eletrólitos e outros": [
-        "LBXSKSI",
-        "LBXSNASI",
-        "LBDSTBSI",
-        "LBDSCASI",
-        "LBDSTPSI",
-        "LBDSUASI",
-    ],
+    group: [
+        feature
+        for feature in SELECTED_FEATURES
+        if FEATURE_METADATA[feature]["group"] == group
+    ]
+    for group in ("Enzimas e proteínas", "Eletrólitos e minerais", "Função renal e metabólica")
 }
 
 
@@ -125,14 +109,24 @@ with st.sidebar:
 st.markdown('<p class="eyebrow">Análise experimental</p>', unsafe_allow_html=True)
 st.title("Explore padrões estatísticos em um painel laboratorial")
 st.markdown(
-    '<p class="quiet">Insira valores públicos ou sintéticos usando os códigos NHANES abaixo. '
+    '<p class="quiet">Insira valores públicos ou sintéticos usando nomes e unidades legíveis. '
     "O modelo compara o padrão do painel com o conjunto experimental e não fornece diagnóstico, avaliação clínica ou recomendação de tratamento.</p>",
     unsafe_allow_html=True,
 )
 
 st.divider()
 st.subheader("Valores do painel")
-st.caption("Deixe campos sem dado em branco. Vírgula ou ponto decimal são aceitos.")
+st.caption("Deixe campos sem dado em branco. Vírgula ou ponto decimal são aceitos. Os códigos NHANES ficam disponíveis apenas como referência técnica.")
+
+if st.button("Carregar painel público de exemplo"):
+    for feature, value in PUBLIC_EXAMPLE_PANEL.items():
+        st.session_state[f"lab_{feature}"] = str(value)
+    st.rerun()
+
+st.caption(
+    "O exemplo é um painel sem identificador, derivado de um registro público do BIOPRO_L. "
+    "Ele serve somente para demonstrar o fluxo e não representa uma pessoa identificável."
+)
 
 raw_values: dict[str, str] = {}
 with st.form("analysis_form"):
@@ -141,11 +135,12 @@ with st.form("analysis_form"):
         with column:
             st.markdown(f"**{group_name}**")
             for feature in features:
+                metadata = FEATURE_METADATA[feature]
                 raw_values[feature] = st.text_input(
-                    feature,
-                    value="",
+                    f"{metadata['name']} ({metadata['unit']})",
+                    key=f"lab_{feature}",
                     placeholder="Sem dado",
-                    help="Código da variável no arquivo público NHANES BIOPRO_L.",
+                    help=f"Código técnico NHANES: {feature}.",
                 )
     submitted = st.form_submit_button("Analisar padrão estatístico", use_container_width=True)
 
@@ -170,16 +165,24 @@ if submitted:
             st.error("Ocorreu um erro de comunicação com a API. Tente novamente.")
         else:
             title = (
-                "Padrão estatisticamente incomum"
+                "Combinação estatisticamente menos frequente"
                 if result["is_statistically_unusual"]
-                else "Padrão abaixo do limiar estatístico"
+                else "Combinação abaixo do limiar estatístico"
+            )
+            plain_language = (
+                "A combinação informada ficou entre os padrões menos frequentes do conjunto "
+                "experimental. Isso pede revisão estatística do painel e de sua completude, "
+                "não uma conclusão clínica."
+                if result["is_statistically_unusual"]
+                else "A combinação informada não ultrapassou o limiar estatístico configurado "
+                "neste experimento. Isso não significa que os resultados sejam clinicamente normais."
             )
             st.markdown(
                 f"""
                 <section class="result" aria-live="polite">
                   <div class="result-kicker">Resultado experimental</div>
                   <div class="result-title">{title}</div>
-                  <div>{result["interpretation"]}</div>
+                  <div>{plain_language}</div>
                 </section>
                 """,
                 unsafe_allow_html=True,
@@ -191,6 +194,20 @@ if submitted:
             )
             st.info(result["limitation"], icon="ℹ️")
             st.caption(f"Versão do modelo: {result['model_version']}")
+            with st.expander("Ver valores enviados"):
+                st.dataframe(
+                    [
+                        {
+                            "Exame": FEATURE_METADATA[feature]["name"],
+                            "Valor": value,
+                            "Unidade": FEATURE_METADATA[feature]["unit"],
+                            "Código NHANES": feature,
+                        }
+                        for feature, value in panel.items()
+                    ],
+                    hide_index=True,
+                    use_container_width=True,
+                )
 
 with st.expander("O que este resultado significa?"):
     st.markdown(
