@@ -68,7 +68,7 @@ st.markdown(
         --accent: oklch(42% 0.11 254);
         --signal: oklch(57% 0.10 72);
       }
-      .stApp { background: var(--paper); color: var(--ink); }
+      .stApp, [data-testid="stAppViewContainer"] { background: var(--paper); color: var(--ink); }
       [data-testid="stSidebar"] { background: oklch(95% 0.009 250); border-right: 1px solid var(--line); }
       [data-testid="stSidebar"] * { color: var(--ink); }
       .block-container { max-width: 1180px; padding-top: 3.2rem; padding-bottom: 4rem; }
@@ -76,14 +76,39 @@ st.markdown(
       h1 { letter-spacing: -0.035em; font-weight: 650; }
       h2 { letter-spacing: -0.02em; font-weight: 620; margin-top: 2rem; }
       .eyebrow { color: var(--accent); font-size: 0.79rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-      .quiet { color: var(--muted); max-width: 72ch; line-height: 1.55; }
-      [data-testid="stTextInput"] input { background: oklch(99% 0.004 88); border: 1px solid var(--line); border-radius: 7px; }
+      .quiet { color: var(--muted) !important; max-width: 72ch; line-height: 1.55; }
+      [data-testid="stMarkdownContainer"] p,
+      [data-testid="stCaptionContainer"],
+      [data-testid="stWidgetLabel"] p,
+      [data-testid="stWidgetLabel"] label,
+      [data-testid="stTextInput"] label,
+      [data-testid="stTextArea"] label,
+      [data-testid="stExpander"] p { color: var(--ink) !important; }
+      [data-testid="stCaptionContainer"] { color: var(--muted) !important; }
+      [data-testid="stTextInput"] input,
+      [data-testid="stTextArea"] textarea {
+        background: oklch(99% 0.004 88) !important;
+        border: 1px solid var(--line) !important;
+        border-radius: 7px;
+        color: var(--ink) !important;
+        -webkit-text-fill-color: var(--ink) !important;
+      }
+      [data-testid="stTextInput"] input::placeholder,
+      [data-testid="stTextArea"] textarea::placeholder { color: var(--muted) !important; opacity: 1; }
       [data-testid="stTextInput"] input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px oklch(42% 0.11 254 / 0.18); }
       [data-testid="stFormSubmitButton"] button { background: var(--accent); border: 1px solid var(--accent); border-radius: 7px; color: oklch(98% 0.004 88); font-weight: 650; }
+      [data-testid="stFormSubmitButton"] button *,
+      [data-testid="stButton"] button * { color: oklch(98% 0.004 88) !important; }
+      [data-testid="stButton"] button {
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        color: oklch(98% 0.004 88) !important;
+      }
       [data-testid="stFormSubmitButton"] button:hover { background: oklch(35% 0.1 254); border-color: oklch(35% 0.1 254); }
       .result { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem 1.4rem; margin: 1rem 0; }
       .result-kicker { color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
       .result-title { font-size: 1.28rem; font-weight: 650; margin: 0.28rem 0 0.4rem; }
+      .result, .result * { color: var(--ink) !important; }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
     </style>
     """,
