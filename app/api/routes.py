@@ -3,7 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.analysis import AnalysisResponse, LaboratoryPanel
+from app.schemas.explanation import ExplanationRequest, ExplanationResponse
 from app.services.anomaly_service import AnomalyService, ModelUnavailableError, get_anomaly_service
+from app.services.rag_service import ExplanationUnavailableError, RagService, get_rag_service
 
 
 router = APIRouter()
@@ -15,6 +17,13 @@ def get_available_service() -> AnomalyService:
         return get_anomaly_service()
     except ModelUnavailableError as error:
         raise HTTPException(status_code=503, detail="Model is temporarily unavailable") from error
+
+
+def get_available_rag_service() -> RagService:
+    try:
+        return get_rag_service()
+    except ValueError as error:
+        raise HTTPException(status_code=503, detail="Knowledge base is temporarily unavailable") from error
 
 
 @router.get("/health")
@@ -34,3 +43,21 @@ def create_analysis(
 ) -> AnalysisResponse:
     """Return a statistical anomaly signal; never a clinical conclusion."""
     return service.analyze(panel)
+
+
+@router.post(
+    "/v1/explanations",
+    response_model=ExplanationResponse,
+    summary="Explain LabInsight methodology using retrieved context",
+)
+def create_explanation(
+    request: ExplanationRequest,
+    service: RagService = Depends(get_available_rag_service),
+) -> ExplanationResponse:
+    try:
+        return service.explain(request)
+    except ExplanationUnavailableError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini explanations are not configured or temporarily unavailable",
+        ) from error

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.api.routes import get_available_service
+from app.api.routes import get_available_rag_service, get_available_service
 from app.main import app
 
 
@@ -13,6 +13,20 @@ class FakeService:
             "observed_feature_count": 2,
             "missing_feature_count": 16,
             "interpretation": "Statistical comparison.",
+            "limitation": "Not a diagnosis.",
+        }
+
+
+class FakeRagService:
+    def explain(self, request):
+        return {
+            "answer": "O limiar é estatístico e experimental.",
+            "sources": [
+                {
+                    "title": "LabInsight experimental scope",
+                    "source_url": "local project documentation",
+                }
+            ],
             "limitation": "Not a diagnosis.",
         }
 
@@ -42,3 +56,22 @@ def test_analysis_rejects_empty_or_unknown_panels() -> None:
     client = TestClient(app)
     assert client.post("/v1/analyses", json={}).status_code == 422
     assert client.post("/v1/analyses", json={"not_a_feature": 12}).status_code == 422
+
+
+def test_explanation_returns_grounded_answer_and_sources() -> None:
+    app.dependency_overrides[get_available_rag_service] = lambda: FakeRagService()
+    client = TestClient(app)
+
+    response = client.post(
+        "/v1/explanations",
+        json={"question": "O que significa o limiar estatístico?"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["sources"][0]["title"] == "LabInsight experimental scope"
+
+
+def test_explanation_rejects_short_questions() -> None:
+    response = TestClient(app).post("/v1/explanations", json={"question": "oi"})
+    assert response.status_code == 422
