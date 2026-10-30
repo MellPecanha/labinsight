@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Notebook exploration and automated tests
+jupyterlab==4.6.5
+matplotlib>=3.10,<4
+pytest==9.2.0
