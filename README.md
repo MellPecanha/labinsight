@@ -41,10 +41,13 @@ POST /v1/analyses                 local user input
         |
         v
 Statistical score + completeness + limitations
+
+Curated local documents --> TF-IDF retrieval --> optional Gemini explanation
 ```
 
 The Streamlit application communicates with the local API. The API loads the
-model artifact locally. No submitted values are sent to an external LLM or API.
+model artifact locally. Laboratory-panel values are never sent to an external
+LLM or API.
 
 ## Dataset and scope
 
@@ -103,6 +106,33 @@ records had all 18 selected features present. This does not validate a clinical
 meaning; it only indicates that missing values were not the main driver of the
 observed flags in this split.
 
+## Grounded explanations (RAG + Gemini)
+
+LabInsight includes a small, inspectable Retrieval-Augmented Generation flow
+for questions about its methodology and source data:
+
+1. The local TF-IDF retriever searches curated Markdown documents in
+   `rag/knowledge_base/`.
+2. The API returns no answer when no source is relevant.
+3. When configured, Gemini receives only the user's methodological question and
+   the retrieved context, then produces a Portuguese explanation constrained by
+   a non-clinical system instruction.
+4. The response returns the titles and URLs of the retrieved sources.
+
+The RAG endpoint does not accept a laboratory panel. Do not include personal or
+identifiable health information in questions sent to a third-party LLM.
+
+To enable Gemini locally, copy the example file and add your own API key:
+
+```bash
+cp .env.example .env
+```
+
+Then set `GEMINI_API_KEY` in `.env`, restart the API, and use `POST
+/v1/explanations` or the “Pergunte sobre o experimento” section in Streamlit.
+The Gemini REST integration follows the official
+[generateContent documentation](https://ai.google.dev/api/generate-content).
+
 ## Project structure
 
 ```text
@@ -113,6 +143,7 @@ ml/notebooks/           Exploratory analysis notebook
 data/raw/               Local public source files, ignored by Git
 data/processed/         Local model artifacts, ignored by Git
 tests/                  ML, API, and interface helper tests
+rag/                    Curated knowledge base and local retrieval logic
 streamlit_app.py        Local Streamlit interface
 ```
 
@@ -208,10 +239,10 @@ responses, and the interface's input parsing helper.
   sampling differences, or a rare combination of otherwise valid measurements.
 - Use public or synthetic values only. Do not submit personal or identifiable
   health information.
+- Gemini explanations are optional and source-limited. They do not replace the
+  retrieved documentation and must not be used for health decisions.
 
 ## Next steps
 
 - Add a second detector as a clearly labelled sensitivity comparison.
-- Add RAG over public NHANES methodology documentation, keeping retrieved
-  explanations separate from the model score.
 - Containerize the API and interface for a reproducible local deployment.
