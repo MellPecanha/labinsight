@@ -121,13 +121,13 @@ streamlit_app.py        Local Streamlit interface
 ### Requirements
 
 - Python 3.13+
-- A virtual environment with the packages in `requirements.txt`
+- A virtual environment with the packages in `requirements-dev.txt`
 - `data/raw/BIOPRO_L.xpt` to train the model
 
 Install dependencies if needed:
 
 ```bash
-./.venv/bin/pip install -r requirements.txt
+./.venv/bin/pip install -r requirements-dev.txt
 ```
 
 ### Train the model
@@ -169,6 +169,22 @@ In a second terminal, with the API running:
 
 Open the URL printed by Streamlit, normally
 [http://localhost:8501](http://localhost:8501).
+
+## Run with Docker
+
+Docker Compose starts the API and the interface as separate services. The model
+artifact remains local and is mounted read-only into the API container.
+
+First ensure `data/processed/isolation_forest.joblib` exists, then run:
+
+```bash
+docker compose up --build
+```
+
+The API is available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+and the interface at [http://localhost:8501](http://localhost:8501). Stop both
+services with `Ctrl+C`, then run `docker compose down` if you want to remove
+the containers and network.
 
 ## Testing
 
