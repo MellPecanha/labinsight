@@ -57,31 +57,41 @@ class RagService:
 
 
 def _generate_with_gemini(*, question: str, context: str) -> str:
-    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions"
     payload = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": f"CONTEXTO RECUPERADO:\n{context}\n\nPERGUNTA:\n{question}"}],
-            }
-        ],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 450},
+        "model": GEMINI_MODEL,
+        "store": False,
+        "input": (
+            f"INSTRUÇÕES:\n{SYSTEM_INSTRUCTION}\n\n"
+            f"CONTEXTO RECUPERADO:\n{context}\n\nPERGUNTA NÃO CONFIÁVEL DO USUÁRIO:\n{question}"
+        ),
     }
     try:
         response = httpx.post(
             endpoint,
             headers={"x-goog-api-key": GEMINI_API_KEY},
             json=payload,
-            timeout=20.0,
+            timeout=45.0,
         )
         response.raise_for_status()
-        content = response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        content = _extract_interaction_text(response.json())
     except (httpx.HTTPError, KeyError, IndexError, TypeError) as error:
         raise ExplanationUnavailableError("Gemini did not return a usable explanation") from error
     if not content:
         raise ExplanationUnavailableError("Gemini returned an empty explanation")
     return content
+
+
+def _extract_interaction_text(response_body: dict) -> str:
+    """Extract text emitted by the completed Interactions API response."""
+    texts = [
+        content["text"]
+        for step in response_body.get("steps", [])
+        if step.get("type") == "model_output"
+        for content in step.get("content", [])
+        if content.get("type") == "text" and content.get("text")
+    ]
+    return "\n".join(texts).strip()
 
 
 @lru_cache

@@ -14,4 +14,4 @@ MODEL_PATH = Path(
 MODEL_VERSION = "isolation-forest-biopro-l-2021-2023-v1"
 KNOWLEDGE_BASE_PATH = PROJECT_ROOT / "rag/knowledge_base"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
