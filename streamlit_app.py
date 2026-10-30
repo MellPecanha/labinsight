@@ -63,6 +63,13 @@ def request_analysis(panel: dict[str, float]) -> dict:
     return response.json()
 
 
+def request_explanation(question: str) -> dict:
+    """Ask the API for a Gemini explanation grounded in local retrieval."""
+    response = httpx.post(f"{API_URL}/v1/explanations", json={"question": question}, timeout=25.0)
+    response.raise_for_status()
+    return response.json()
+
+
 st.set_page_config(page_title="LabInsight", page_icon="◌", layout="wide")
 
 st.markdown(
@@ -191,3 +198,45 @@ with st.expander("O que este resultado significa?"):
         "no conjunto de referência. Um score maior indica maior afastamento estatístico. "
         "O resultado não identifica uma doença e não substitui avaliação profissional."
     )
+
+st.divider()
+st.subheader("Pergunte sobre o experimento")
+st.caption(
+    "As respostas usam documentos recuperados localmente sobre o projeto e o NHANES. "
+    "Não informe dados pessoais ou peça interpretação clínica."
+)
+
+with st.form("explanation_form"):
+    question = st.text_area(
+        "Pergunta metodológica",
+        placeholder="Ex.: Por que o experimento não usa WTPH2YR no score?",
+        max_chars=800,
+    )
+    explanation_submitted = st.form_submit_button("Buscar explicação", use_container_width=True)
+
+if explanation_submitted:
+    if len(question.strip()) < 5:
+        st.warning("Escreva uma pergunta com pelo menos cinco caracteres.")
+    else:
+        try:
+            with st.spinner("Recuperando contexto e preparando a explicação..."):
+                explanation = request_explanation(question)
+        except httpx.ConnectError:
+            st.error("Não foi possível alcançar a API local.")
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == 503:
+                st.warning(
+                    "As explicações com Gemini ainda não estão configuradas. "
+                    "Copie `.env.example` para `.env` e informe `GEMINI_API_KEY`."
+                )
+            else:
+                st.error(f"A API recusou a solicitação ({error.response.status_code}).")
+        except httpx.HTTPError:
+            st.error("Ocorreu um erro de comunicação com a API. Tente novamente.")
+        else:
+            st.markdown(explanation["answer"])
+            if explanation["sources"]:
+                st.caption("Fontes recuperadas")
+                for source in explanation["sources"]:
+                    st.markdown(f"- [{source['title']}]({source['source_url']})")
+            st.info(explanation["limitation"], icon="ℹ️")
