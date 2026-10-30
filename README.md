@@ -24,6 +24,11 @@ A high score means that a combination of values is statistically less common in
 the experiment's reference data. It does not identify a disease or establish a
 clinical conclusion.
 
+The interface displays readable laboratory names and SI units. NHANES variable
+codes remain visible only as technical references. It also offers a complete,
+de-identified public example panel so the workflow can be demonstrated without
+inventing values or entering personal information.
+
 ## Architecture
 
 ```text
