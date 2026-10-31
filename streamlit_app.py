@@ -5,12 +5,15 @@ Run the FastAPI service first, then start this app with:
 """
 
 import os
+from copy import deepcopy
 from typing import Final
 
 import httpx
+import pandas as pd
 import streamlit as st
 
 from app.core.public_example import PUBLIC_EXAMPLE_PANEL
+from app.core.synthetic_report import SYNTHETIC_REPORT_ITEMS
 from ml.preprocessing.biopro import FEATURE_METADATA, SELECTED_FEATURES
 
 API_URL: Final = os.getenv("LABINSIGHT_API_URL", "http://127.0.0.1:8000")
@@ -52,6 +55,30 @@ def request_explanation(question: str) -> dict:
     response = httpx.post(f"{API_URL}/v1/explanations", json={"question": question}, timeout=25.0)
     response.raise_for_status()
     return response.json()
+
+
+def request_report_evaluation(items: list[dict]) -> dict:
+    """Compare values only with the intervals supplied in the report."""
+    response = httpx.post(f"{API_URL}/v1/report-evaluations", json={"items": items}, timeout=10.0)
+    response.raise_for_status()
+    return response.json()
+
+
+def report_table(items: list[dict]) -> pd.DataFrame:
+    """Present a synthetic report with human-readable test names."""
+    return pd.DataFrame(
+        [
+            {
+                "Código técnico": item["feature_code"],
+                "Exame": FEATURE_METADATA[item["feature_code"]]["name"],
+                "Resultado": item["result"],
+                "Unidade": item["unit"],
+                "Limite inferior": item["reference_lower"],
+                "Limite superior": item["reference_upper"],
+            }
+            for item in items
+        ]
+    )
 
 
 st.set_page_config(page_title="LabInsight", page_icon="◌", layout="wide")
@@ -131,16 +158,88 @@ with st.sidebar:
     st.markdown("**Privacidade**")
     st.caption("A interface chama apenas a API local. Não informe dados pessoais.")
 
-st.markdown('<p class="eyebrow">Análise experimental</p>', unsafe_allow_html=True)
-st.title("Explore padrões estatísticos em um painel laboratorial")
+st.markdown('<p class="eyebrow">Leitor educacional de laudos</p>', unsafe_allow_html=True)
+st.title("Compare resultados com o intervalo informado no laudo")
 st.markdown(
-    '<p class="quiet">Insira valores públicos ou sintéticos usando nomes e unidades legíveis. '
-    "O modelo compara o padrão do painel com o conjunto experimental e não fornece diagnóstico, avaliação clínica ou recomendação de tratamento.</p>",
+    '<p class="quiet">O LabInsight compara cada resultado com o intervalo apresentado no mesmo laudo. '
+    "A comparação é matemática e não fornece diagnóstico, causas, avaliação clínica ou recomendação de tratamento.</p>",
     unsafe_allow_html=True,
 )
 
 st.divider()
-st.subheader("Valores do painel")
+st.subheader("Relatório sintético para demonstração")
+st.caption(
+    "Edite valores, unidades e limites como exercício técnico. Use somente dados sintéticos ou públicos, "
+    "nunca informações pessoais de saúde."
+)
+
+if "synthetic_report" not in st.session_state:
+    st.session_state.synthetic_report = report_table(SYNTHETIC_REPORT_ITEMS)
+
+if st.button("Restaurar relatório sintético"):
+    st.session_state.synthetic_report = report_table(deepcopy(SYNTHETIC_REPORT_ITEMS))
+    st.rerun()
+
+with st.form("report_reader_form"):
+    edited_report = st.data_editor(
+        st.session_state.synthetic_report,
+        column_config={"Código técnico": None},
+        disabled=["Código técnico", "Exame"],
+        hide_index=True,
+        num_rows="fixed",
+        use_container_width=True,
+        key="report_editor",
+    )
+    report_submitted = st.form_submit_button("Comparar com os intervalos do laudo", use_container_width=True)
+
+if report_submitted:
+    report_items = [
+        {
+            "feature_code": row["Código técnico"],
+            "result": row["Resultado"],
+            "unit": row["Unidade"],
+            "reference_lower": row["Limite inferior"],
+            "reference_upper": row["Limite superior"],
+        }
+        for row in edited_report.to_dict(orient="records")
+    ]
+    try:
+        evaluation = request_report_evaluation(report_items)
+    except httpx.ConnectError:
+        st.error("Não foi possível alcançar a API local.")
+    except httpx.HTTPStatusError as error:
+        st.error(f"Verifique os valores e intervalos informados ({error.response.status_code}).")
+    except httpx.HTTPError:
+        st.error("Ocorreu um erro de comunicação com a API. Tente novamente.")
+    else:
+        position_labels = {
+            "below": "Abaixo do intervalo informado",
+            "within": "Dentro do intervalo informado",
+            "above": "Acima do intervalo informado",
+        }
+        st.subheader("Comparação do relatório")
+        st.dataframe(
+            [
+                {
+                    "Exame": item["test_name"],
+                    "Resultado": item["result"],
+                    "Unidade": item["unit"],
+                    "Intervalo informado": f"{item['reference_lower']} a {item['reference_upper']}",
+                    "Comparação": position_labels[item["position"]],
+                }
+                for item in evaluation["items"]
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+        st.info(evaluation["limitation"], icon="ℹ️")
+
+st.divider()
+st.subheader("Simulador de padrão estatístico")
+st.caption(
+    "Recurso avançado: compara um painel de 18 variáveis com padrões do NHANES BIOPRO_L. "
+    "Não interpreta resultados individuais."
+)
 st.caption("Deixe campos sem dado em branco. Vírgula ou ponto decimal são aceitos. Os códigos NHANES ficam disponíveis apenas como referência técnica.")
 
 if st.button("Carregar painel público de exemplo"):
