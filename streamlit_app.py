@@ -187,10 +187,10 @@ with st.form("report_reader_form"):
         disabled=["Código técnico", "Exame"],
         hide_index=True,
         num_rows="fixed",
-        use_container_width=True,
+        width="stretch",
         key="report_editor",
     )
-    report_submitted = st.form_submit_button("Comparar com os intervalos do laudo", use_container_width=True)
+    report_submitted = st.form_submit_button("Comparar com os intervalos do laudo", width="stretch")
 
 if report_submitted:
     report_items = [
@@ -230,7 +230,7 @@ if report_submitted:
                 for item in evaluation["items"]
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
         st.info(evaluation["limitation"], icon="ℹ️")
 
@@ -266,7 +266,7 @@ with st.form("analysis_form"):
                     placeholder="Sem dado",
                     help=f"Código técnico NHANES: {feature}.",
                 )
-    submitted = st.form_submit_button("Analisar padrão estatístico", use_container_width=True)
+    submitted = st.form_submit_button("Analisar padrão estatístico", width="stretch")
 
 if submitted:
     panel, invalid_fields = parse_panel(raw_values)
@@ -330,7 +330,7 @@ if submitted:
                         for feature, value in panel.items()
                     ],
                     hide_index=True,
-                    use_container_width=True,
+                    width="stretch",
                 )
 
 with st.expander("O que este resultado significa?"):
@@ -353,7 +353,7 @@ with st.form("explanation_form"):
         placeholder="Ex.: Por que o experimento não usa WTPH2YR no score?",
         max_chars=800,
     )
-    explanation_submitted = st.form_submit_button("Buscar explicação", use_container_width=True)
+    explanation_submitted = st.form_submit_button("Buscar explicação", width="stretch")
 
 if explanation_submitted:
     if len(question.strip()) < 5:
