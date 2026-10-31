@@ -6,24 +6,25 @@ product
 
 ## Users
 
-Primary users are data practitioners, AI engineers, students, and researchers who
-want to explore reproducible anomaly-detection workflows over public laboratory
-datasets. They use the platform to submit synthetic or public panels, inspect
-the statistical signal produced by the model, and understand the limitations of
-each result.
+Primary users are students, data practitioners, and AI engineers who want to
+understand the structure of laboratory reports and explore public laboratory
+datasets responsibly. They use synthetic or public examples to compare a value
+with the reference interval printed on the same report, inspect methodological
+limits, and explore statistical patterns in NHANES data.
 
 ## Product Purpose
 
-LabInsight is an experimental platform for exploring statistical patterns in
-public laboratory data. It integrates data preparation, unsupervised anomaly
-detection, a REST API, and an explanatory interface into one reproducible
-workflow.
+LabInsight is an educational platform for structured reading of laboratory
+reports and exploration of public laboratory data. Its primary workflow compares
+a result with the reference interval supplied by that same report. Its secondary
+workflow explores data quality and statistically uncommon patterns in public
+NHANES data using unsupervised machine learning.
 
-Its purpose is to make the mechanics and boundaries of an AI-based anomaly
-analysis visible: how data are prepared, how a score is generated, how missing
-values affect the analysis, and why a statistical signal must not be treated as
-a clinical conclusion. LabInsight is not a diagnostic, triage, or treatment
-system.
+Its purpose is to make the mechanics and boundaries of data-driven health
+software visible: interval comparison is deterministic and transparent; RAG and
+Gemini explain the dataset and methodology from retrieved sources; and anomaly
+detection is reserved for public-data exploration. LabInsight is not a
+diagnostic, triage, or treatment system.
 
 ## Brand Personality
 
@@ -37,10 +38,10 @@ Avoid diagnostic or hospital-dashboard aesthetics, alarming red result screens, 
 
 ## Design Principles
 
-1. Make the workflow reproducible, from source data to model response.
-2. Explain the statistical signal without overstating its meaning.
-3. Reveal data completeness and methodological limits alongside every result.
-4. Keep clinical decisions outside the scope of the product.
+1. Compare only with the interval supplied by the same report.
+2. Keep deterministic comparison separate from AI-generated explanations.
+3. Reveal data completeness, source context, and methodological limits.
+4. Keep clinical decisions, causes, and treatment outside the product scope.
 5. Prefer calm, familiar product patterns that support careful exploration.
 
 ## Accessibility & Inclusion

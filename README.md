@@ -1,8 +1,9 @@
 # LabInsight
 
-LabInsight is an experimental platform for exploring statistical patterns in
-public laboratory data. It combines data preparation, unsupervised machine
-learning, a REST API, and an explanatory interface in a reproducible workflow.
+LabInsight is an educational platform for structured reading of laboratory
+reports and exploration of public laboratory data. It combines transparent
+interval comparison, RAG, LLM integration, unsupervised machine learning, a
+REST API, and an explanatory interface in a reproducible workflow.
 
 The project uses the public NHANES `BIOPRO_L` file from the 2021–2023 cycle as
 its initial reference dataset. It is designed for technical exploration and
@@ -11,18 +12,18 @@ clinical assessments, triage, or treatment recommendations.
 
 ## What it does
 
-Given a panel of up to 18 laboratory variables, LabInsight:
+Given a synthetic or public laboratory report, LabInsight:
 
-1. applies the same preprocessing used during training;
-2. calculates an Isolation Forest anomaly score;
-3. marks whether the score is above an experimentally configured statistical
-   threshold;
-4. reports how many values were observed and how many were missing; and
-5. presents the result together with its methodological limitations.
+1. compares each value with the reference interval supplied by that same report;
+2. labels the result as below, within, or above that supplied interval;
+3. explains the limit of this purely mathematical comparison;
+4. offers grounded questions about methodology and source data through RAG; and
+5. keeps Isolation Forest as an advanced workflow for public NHANES exploration.
 
-A high score means that a combination of values is statistically less common in
-the experiment's reference data. It does not identify a disease or establish a
-clinical conclusion.
+The interval comparison does not identify a disease or establish a clinical
+conclusion. An Isolation Forest score, when used in the advanced workflow,
+means only that a combination of values is statistically less common in the
+experiment's public reference data.
 
 The interface displays readable laboratory names and SI units. NHANES variable
 codes remain visible only as technical references. It also offers a complete,
@@ -32,6 +33,14 @@ inventing values or entering personal information.
 ## Architecture
 
 ```text
+Synthetic or public report
+        |
+        v
+Deterministic interval comparison
+        |
+        v
+Below / within / above supplied interval
+
 NHANES BIOPRO_L (.xpt)
         |
         v
@@ -68,6 +77,20 @@ The original `.xpt` files and trained artifacts are excluded from Git by
 design. Store them locally under `data/raw/` and `data/processed/`.
 
 ## Methodology
+
+### Educational report reader
+
+The report reader does not contain a clinical table of “normal” values. For
+each item, it receives the result, unit, lower bound, and upper bound shown on
+the same report, then performs a transparent numeric comparison:
+
+- result < lower bound: below the supplied interval;
+- lower bound ≤ result ≤ upper bound: within the supplied interval; and
+- result > upper bound: above the supplied interval.
+
+This is intentionally separate from the RAG and LLM layers. The comparison is
+deterministic and auditable; Gemini does not receive the report values. The
+included report is fictional and exists only to demonstrate the workflow.
 
 ### Preprocessing
 
@@ -235,6 +258,9 @@ responses, and the interface's input parsing helper.
 
 - This model is trained on a selected set of public NHANES measurements. Its
   output cannot be generalized as a clinical reference range.
+- Reference intervals can vary by laboratory, assay, unit, and characteristics
+  of the population. LabInsight therefore compares only with the interval
+  supplied by the same report and does not maintain its own clinical ranges.
 - Missing values are median-imputed. Completeness is returned with every result
   because incomplete panels can affect the score.
 - The model does not use NHANES survey weights in the anomaly calculation.
