@@ -5,50 +5,15 @@ Run the FastAPI service first, then start this app with:
 """
 
 import os
-from copy import deepcopy
 from typing import Final
 
 import httpx
-import pandas as pd
 import streamlit as st
 
-from app.core.public_example import PUBLIC_EXAMPLE_PANEL
 from app.core.synthetic_report import SYNTHETIC_REPORT_ITEMS
 from ml.preprocessing.biopro import FEATURE_METADATA, SELECTED_FEATURES
 
 API_URL: Final = os.getenv("LABINSIGHT_API_URL", "http://127.0.0.1:8000")
-
-FEATURE_GROUPS: Final = {
-    group: [
-        feature
-        for feature in SELECTED_FEATURES
-        if FEATURE_METADATA[feature]["group"] == group
-    ]
-    for group in ("Enzimas e proteínas", "Eletrólitos e minerais", "Função renal e metabólica")
-}
-
-
-def parse_panel(raw_values: dict[str, str]) -> tuple[dict[str, float], list[str]]:
-    """Keep only supplied values and report fields that are not valid numbers."""
-    panel: dict[str, float] = {}
-    invalid_fields: list[str] = []
-    for feature, raw_value in raw_values.items():
-        value = raw_value.strip().replace(",", ".")
-        if not value:
-            continue
-        try:
-            panel[feature] = float(value)
-        except ValueError:
-            invalid_fields.append(feature)
-    return panel, invalid_fields
-
-
-def request_analysis(panel: dict[str, float]) -> dict:
-    """Call the local API, keeping the UI independent from the ML artifact."""
-    response = httpx.post(f"{API_URL}/v1/analyses", json=panel, timeout=10.0)
-    response.raise_for_status()
-    return response.json()
-
 
 def request_explanation(question: str) -> dict:
     """Ask the API for a Gemini explanation grounded in local retrieval."""
@@ -62,23 +27,6 @@ def request_report_evaluation(items: list[dict]) -> dict:
     response = httpx.post(f"{API_URL}/v1/report-evaluations", json={"items": items}, timeout=10.0)
     response.raise_for_status()
     return response.json()
-
-
-def report_table(items: list[dict]) -> pd.DataFrame:
-    """Present a synthetic report with human-readable test names."""
-    return pd.DataFrame(
-        [
-            {
-                "Código técnico": item["feature_code"],
-                "Exame": FEATURE_METADATA[item["feature_code"]]["name"],
-                "Resultado": item["result"],
-                "Unidade": item["unit"],
-                "Limite inferior": item["reference_lower"],
-                "Limite superior": item["reference_upper"],
-            }
-            for item in items
-        ]
-    )
 
 
 st.set_page_config(page_title="LabInsight", page_icon="◌", layout="wide")
@@ -148,13 +96,13 @@ with st.sidebar:
     st.divider()
     st.markdown("**Como usar**")
     st.markdown(
-        "1. Informe dados públicos ou sintéticos.\n"
-        "2. Envie o painel ao modelo.\n"
-        "3. Leia o resultado como sinal estatístico."
+        "1. Escolha um ou mais exames.\n"
+        "2. Informe resultado e intervalo do laudo.\n"
+        "3. Leia a comparação matemática."
     )
     st.divider()
-    st.markdown("**Modelo**")
-    st.caption("Isolation Forest\nNHANES BIOPRO_L, 2021–2023")
+    st.markdown("**Como funciona**")
+    st.caption("Comparação determinística\nIntervalo do próprio laudo")
     st.markdown("**Privacidade**")
     st.caption("A interface chama apenas a API local. Não informe dados pessoais.")
 
@@ -167,178 +115,99 @@ st.markdown(
 )
 
 st.divider()
-st.subheader("Relatório sintético para demonstração")
+st.subheader("Selecione os exames do relatório")
 st.caption(
-    "Edite valores, unidades e limites como exercício técnico. Use somente dados sintéticos ou públicos, "
+    "Informe um exame ou todos os exames disponíveis. Use somente dados sintéticos ou públicos, "
     "nunca informações pessoais de saúde."
 )
 
-if "synthetic_report" not in st.session_state:
-    st.session_state.synthetic_report = report_table(SYNTHETIC_REPORT_ITEMS)
-
-if st.button("Restaurar relatório sintético"):
-    st.session_state.synthetic_report = report_table(deepcopy(SYNTHETIC_REPORT_ITEMS))
+if st.button("Carregar exemplo sintético"):
+    st.session_state.selected_report_features = [item["feature_code"] for item in SYNTHETIC_REPORT_ITEMS]
+    for item in SYNTHETIC_REPORT_ITEMS:
+        code = item["feature_code"]
+        st.session_state[f"report_result_{code}"] = item["result"]
+        st.session_state[f"report_unit_{code}"] = item["unit"]
+        st.session_state[f"report_lower_{code}"] = item["reference_lower"]
+        st.session_state[f"report_upper_{code}"] = item["reference_upper"]
     st.rerun()
 
+selected_features = st.multiselect(
+    "Exames para comparar",
+    options=SELECTED_FEATURES,
+    format_func=lambda code: f"{FEATURE_METADATA[code]['name']} ({FEATURE_METADATA[code]['unit']})",
+    placeholder="Escolha um ou mais exames",
+    key="selected_report_features",
+)
+
 with st.form("report_reader_form"):
-    edited_report = st.data_editor(
-        st.session_state.synthetic_report,
-        column_config={"Código técnico": None},
-        disabled=["Código técnico", "Exame"],
-        hide_index=True,
-        num_rows="fixed",
-        width="stretch",
-        key="report_editor",
-    )
+    report_items: list[dict] = []
+    for feature in selected_features:
+        metadata = FEATURE_METADATA[feature]
+        st.markdown(f"**{metadata['name']}** · {metadata['unit']}")
+        value_column, unit_column, lower_column, upper_column = st.columns([1.2, 1, 1, 1])
+        with value_column:
+            result = st.number_input("Resultado", value=None, key=f"report_result_{feature}")
+        with unit_column:
+            unit = st.text_input("Unidade", value=metadata["unit"], key=f"report_unit_{feature}")
+        with lower_column:
+            lower = st.number_input("Limite inferior", value=None, key=f"report_lower_{feature}")
+        with upper_column:
+            upper = st.number_input("Limite superior", value=None, key=f"report_upper_{feature}")
+        report_items.append(
+            {
+                "feature_code": feature,
+                "result": result,
+                "unit": unit,
+                "reference_lower": lower,
+                "reference_upper": upper,
+            }
+        )
     report_submitted = st.form_submit_button("Comparar com os intervalos do laudo", width="stretch")
 
 if report_submitted:
-    report_items = [
-        {
-            "feature_code": row["Código técnico"],
-            "result": row["Resultado"],
-            "unit": row["Unidade"],
-            "reference_lower": row["Limite inferior"],
-            "reference_upper": row["Limite superior"],
-        }
-        for row in edited_report.to_dict(orient="records")
+    incomplete_features = [
+        FEATURE_METADATA[item["feature_code"]]["name"]
+        for item in report_items
+        if item["result"] is None
+        or item["reference_lower"] is None
+        or item["reference_upper"] is None
+        or not item["unit"].strip()
     ]
-    try:
-        evaluation = request_report_evaluation(report_items)
-    except httpx.ConnectError:
-        st.error("Não foi possível alcançar a API local.")
-    except httpx.HTTPStatusError as error:
-        st.error(f"Verifique os valores e intervalos informados ({error.response.status_code}).")
-    except httpx.HTTPError:
-        st.error("Ocorreu um erro de comunicação com a API. Tente novamente.")
-    else:
-        position_labels = {
-            "below": "Abaixo do intervalo informado",
-            "within": "Dentro do intervalo informado",
-            "above": "Acima do intervalo informado",
-        }
-        st.subheader("Comparação do relatório")
-        st.dataframe(
-            [
-                {
-                    "Exame": item["test_name"],
-                    "Resultado": item["result"],
-                    "Unidade": item["unit"],
-                    "Intervalo informado": f"{item['reference_lower']} a {item['reference_upper']}",
-                    "Comparação": position_labels[item["position"]],
-                }
-                for item in evaluation["items"]
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-        st.info(evaluation["limitation"], icon="ℹ️")
-
-st.divider()
-st.subheader("Simulador de padrão estatístico")
-st.caption(
-    "Recurso avançado: compara um painel de 18 variáveis com padrões do NHANES BIOPRO_L. "
-    "Não interpreta resultados individuais."
-)
-st.caption("Deixe campos sem dado em branco. Vírgula ou ponto decimal são aceitos. Os códigos NHANES ficam disponíveis apenas como referência técnica.")
-
-if st.button("Carregar painel público de exemplo"):
-    for feature, value in PUBLIC_EXAMPLE_PANEL.items():
-        st.session_state[f"lab_{feature}"] = str(value)
-    st.rerun()
-
-st.caption(
-    "O exemplo é um painel sem identificador, derivado de um registro público do BIOPRO_L. "
-    "Ele serve somente para demonstrar o fluxo e não representa uma pessoa identificável."
-)
-
-raw_values: dict[str, str] = {}
-with st.form("analysis_form"):
-    columns = st.columns(3, gap="large")
-    for column, (group_name, features) in zip(columns, FEATURE_GROUPS.items(), strict=True):
-        with column:
-            st.markdown(f"**{group_name}**")
-            for feature in features:
-                metadata = FEATURE_METADATA[feature]
-                raw_values[feature] = st.text_input(
-                    f"{metadata['name']} ({metadata['unit']})",
-                    key=f"lab_{feature}",
-                    placeholder="Sem dado",
-                    help=f"Código técnico NHANES: {feature}.",
-                )
-    submitted = st.form_submit_button("Analisar padrão estatístico", width="stretch")
-
-if submitted:
-    panel, invalid_fields = parse_panel(raw_values)
-    if invalid_fields:
-        st.error(f"Informe números válidos nestes campos: {', '.join(invalid_fields)}.")
-    elif not panel:
-        st.warning("Informe pelo menos um valor laboratorial para executar a análise.")
+    if not report_items:
+        st.warning("Escolha pelo menos um exame para comparar.")
+    elif incomplete_features:
+        st.warning(f"Complete resultado, unidade e limites para: {', '.join(incomplete_features)}.")
     else:
         try:
-            with st.spinner("Comparando o painel com o modelo experimental..."):
-                result = request_analysis(panel)
+            evaluation = request_report_evaluation(report_items)
         except httpx.ConnectError:
-            st.error(
-                "Não foi possível alcançar a API local. Inicie-a com "
-                "`./.venv/bin/uvicorn app.main:app --reload`."
-            )
+            st.error("Não foi possível alcançar a API local.")
         except httpx.HTTPStatusError as error:
-            st.error(f"A API recusou a solicitação ({error.response.status_code}).")
+            st.error(f"Verifique os valores e intervalos informados ({error.response.status_code}).")
         except httpx.HTTPError:
             st.error("Ocorreu um erro de comunicação com a API. Tente novamente.")
         else:
-            title = (
-                "Combinação estatisticamente menos frequente"
-                if result["is_statistically_unusual"]
-                else "Combinação abaixo do limiar estatístico"
+            position_labels = {
+                "below": "Abaixo do intervalo informado",
+                "within": "Dentro do intervalo informado",
+                "above": "Acima do intervalo informado",
+            }
+            st.subheader("Comparação do relatório")
+            st.dataframe(
+                [
+                    {
+                        "Exame": item["test_name"],
+                        "Resultado": item["result"],
+                        "Unidade": item["unit"],
+                        "Intervalo informado": f"{item['reference_lower']} a {item['reference_upper']}",
+                        "Comparação": position_labels[item["position"]],
+                    }
+                    for item in evaluation["items"]
+                ],
+                hide_index=True,
+                width="stretch",
             )
-            plain_language = (
-                "A combinação informada ficou entre os padrões menos frequentes do conjunto "
-                "experimental. Isso pede revisão estatística do painel e de sua completude, "
-                "não uma conclusão clínica."
-                if result["is_statistically_unusual"]
-                else "A combinação informada não ultrapassou o limiar estatístico configurado "
-                "neste experimento. Isso não significa que os resultados sejam clinicamente normais."
-            )
-            st.markdown(
-                f"""
-                <section class="result" aria-live="polite">
-                  <div class="result-kicker">Resultado experimental</div>
-                  <div class="result-title">{title}</div>
-                  <div>{plain_language}</div>
-                </section>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f"**Score estatístico:** `{result['anomaly_score']:.3f}`  \n"
-                f"**Exames informados:** {result['observed_feature_count']} de 18  \n"
-                f"**Exames ausentes:** {result['missing_feature_count']} de 18"
-            )
-            st.info(result["limitation"], icon="ℹ️")
-            st.caption(f"Versão do modelo: {result['model_version']}")
-            with st.expander("Ver valores enviados"):
-                st.dataframe(
-                    [
-                        {
-                            "Exame": FEATURE_METADATA[feature]["name"],
-                            "Valor": value,
-                            "Unidade": FEATURE_METADATA[feature]["unit"],
-                            "Código NHANES": feature,
-                        }
-                        for feature, value in panel.items()
-                    ],
-                    hide_index=True,
-                    width="stretch",
-                )
-
-with st.expander("O que este resultado significa?"):
-    st.markdown(
-        "O Isolation Forest procura combinações de valores que são pouco frequentes "
-        "no conjunto de referência. Um score maior indica maior afastamento estatístico. "
-        "O resultado não identifica uma doença e não substitui avaliação profissional."
-    )
+            st.info(evaluation["limitation"], icon="ℹ️")
 
 st.divider()
 st.subheader("Pergunte sobre o experimento")
