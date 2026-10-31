@@ -23,8 +23,8 @@ def request_explanation(question: str) -> dict:
 
 
 def request_report_evaluation(items: list[dict]) -> dict:
-    """Compare values only with the intervals supplied in the report."""
-    response = httpx.post(f"{API_URL}/v1/report-evaluations", json={"items": items}, timeout=10.0)
+    """Compare values with the non-clinical NHANES public-data band."""
+    response = httpx.post(f"{API_URL}/v1/public-distribution-comparisons", json={"items": items}, timeout=10.0)
     response.raise_for_status()
     return response.json()
 
@@ -102,22 +102,22 @@ with st.sidebar:
     )
     st.divider()
     st.markdown("**Como funciona**")
-    st.caption("Comparação determinística\nIntervalo do próprio laudo")
+    st.caption("Comparação estatística\nFaixa pública NHANES")
     st.markdown("**Privacidade**")
     st.caption("A interface chama apenas a API local. Não informe dados pessoais.")
 
 st.markdown('<p class="eyebrow">Leitor educacional de laudos</p>', unsafe_allow_html=True)
-st.title("Compare resultados com o intervalo informado no laudo")
+st.title("Compare resultados com uma faixa estatística pública")
 st.markdown(
-    '<p class="quiet">O LabInsight compara cada resultado com o intervalo apresentado no mesmo laudo. '
-    "A comparação é matemática e não fornece diagnóstico, causas, avaliação clínica ou recomendação de tratamento.</p>",
+    '<p class="quiet">O LabInsight compara cada resultado com os percentis 5 e 95 do dataset público NHANES BIOPRO_L. '
+    "Esta faixa é educacional e estatística, não clínica. Ela não fornece diagnóstico, causas, avaliação clínica ou recomendação de tratamento.</p>",
     unsafe_allow_html=True,
 )
 
 st.divider()
 st.subheader("Selecione os exames do relatório")
 st.caption(
-    "Informe um exame ou todos os exames disponíveis. Use somente dados sintéticos ou públicos, "
+    "Informe um exame ou todos os exames disponíveis. A unidade precisa coincidir com a exibida. Use somente dados sintéticos ou públicos, "
     "nunca informações pessoais de saúde."
 )
 
@@ -127,8 +127,6 @@ if st.button("Carregar exemplo sintético"):
         code = item["feature_code"]
         st.session_state[f"report_result_{code}"] = item["result"]
         st.session_state[f"report_unit_{code}"] = item["unit"]
-        st.session_state[f"report_lower_{code}"] = item["reference_lower"]
-        st.session_state[f"report_upper_{code}"] = item["reference_upper"]
     st.rerun()
 
 selected_features = st.multiselect(
@@ -144,62 +142,54 @@ with st.form("report_reader_form"):
     for feature in selected_features:
         metadata = FEATURE_METADATA[feature]
         st.markdown(f"**{metadata['name']}** · {metadata['unit']}")
-        value_column, unit_column, lower_column, upper_column = st.columns([1.2, 1, 1, 1])
+        value_column, unit_column = st.columns([1.2, 1])
         with value_column:
             result = st.number_input("Resultado", value=None, key=f"report_result_{feature}")
         with unit_column:
-            unit = st.text_input("Unidade", value=metadata["unit"], key=f"report_unit_{feature}")
-        with lower_column:
-            lower = st.number_input("Limite inferior", value=None, key=f"report_lower_{feature}")
-        with upper_column:
-            upper = st.number_input("Limite superior", value=None, key=f"report_upper_{feature}")
+            unit = st.text_input("Unidade", value=metadata["unit"], key=f"report_unit_{feature}", disabled=True)
         report_items.append(
             {
                 "feature_code": feature,
                 "result": result,
                 "unit": unit,
-                "reference_lower": lower,
-                "reference_upper": upper,
             }
         )
-    report_submitted = st.form_submit_button("Comparar com os intervalos do laudo", width="stretch")
+    report_submitted = st.form_submit_button("Comparar com a faixa estatística", width="stretch")
 
 if report_submitted:
     incomplete_features = [
         FEATURE_METADATA[item["feature_code"]]["name"]
         for item in report_items
         if item["result"] is None
-        or item["reference_lower"] is None
-        or item["reference_upper"] is None
         or not item["unit"].strip()
     ]
     if not report_items:
         st.warning("Escolha pelo menos um exame para comparar.")
     elif incomplete_features:
-        st.warning(f"Complete resultado, unidade e limites para: {', '.join(incomplete_features)}.")
+        st.warning(f"Complete o resultado para: {', '.join(incomplete_features)}.")
     else:
         try:
             evaluation = request_report_evaluation(report_items)
         except httpx.ConnectError:
             st.error("Não foi possível alcançar a API local.")
         except httpx.HTTPStatusError as error:
-            st.error(f"Verifique os valores e intervalos informados ({error.response.status_code}).")
+            st.error(f"Verifique os valores e unidades informados ({error.response.status_code}).")
         except httpx.HTTPError:
             st.error("Ocorreu um erro de comunicação com a API. Tente novamente.")
         else:
             position_labels = {
-                "below": "Abaixo do intervalo informado",
-                "within": "Dentro do intervalo informado",
-                "above": "Acima do intervalo informado",
+                "below": "Abaixo da faixa estatística",
+                "within": "Dentro da faixa estatística",
+                "above": "Acima da faixa estatística",
             }
-            st.subheader("Comparação do relatório")
+            st.subheader("Comparação estatística")
             st.dataframe(
                 [
                     {
                         "Exame": item["test_name"],
                         "Resultado": item["result"],
                         "Unidade": item["unit"],
-                        "Intervalo informado": f"{item['reference_lower']} a {item['reference_upper']}",
+                        "Faixa pública (p5–p95)": f"{item['band_lower']} a {item['band_upper']}",
                         "Comparação": position_labels[item["position"]],
                     }
                     for item in evaluation["items"]
