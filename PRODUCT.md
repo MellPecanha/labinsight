@@ -9,16 +9,16 @@ product
 Primary users are students, data practitioners, and AI engineers who want to
 understand the structure of laboratory reports and explore public laboratory
 datasets responsibly. They use synthetic or public examples to compare a value
-with the reference interval printed on the same report, inspect methodological
-limits, and explore statistical patterns in NHANES data.
+with a descriptive public-data band, inspect methodological limits, and
+explore statistical patterns in NHANES data.
 
 ## Product Purpose
 
 LabInsight is an educational platform for structured reading of laboratory
 reports and exploration of public laboratory data. Its primary workflow compares
-a result with the reference interval supplied by that same report. Its secondary
-workflow explores data quality and statistically uncommon patterns in public
-NHANES data using unsupervised machine learning.
+a result with a descriptive percentile band derived from public NHANES data.
+Its secondary workflow explores data quality and statistically uncommon patterns
+in public NHANES data using unsupervised machine learning.
 
 Its purpose is to make the mechanics and boundaries of data-driven health
 software visible: interval comparison is deterministic and transparent; RAG and
@@ -38,7 +38,7 @@ Avoid diagnostic or hospital-dashboard aesthetics, alarming red result screens, 
 
 ## Design Principles
 
-1. Compare only with the interval supplied by the same report.
+1. Label public-data bands as descriptive statistics, never clinical ranges.
 2. Keep deterministic comparison separate from AI-generated explanations.
 3. Reveal data completeness, source context, and methodological limits.
 4. Keep clinical decisions, causes, and treatment outside the product scope.
