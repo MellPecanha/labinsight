@@ -5,9 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.analysis import AnalysisResponse, LaboratoryPanel
 from app.schemas.explanation import ExplanationRequest, ExplanationResponse
 from app.schemas.report import ReportEvaluationRequest, ReportEvaluationResponse
+from app.schemas.public_distribution import (
+    PublicDistributionComparisonRequest,
+    PublicDistributionComparisonResponse,
+)
 from app.services.anomaly_service import AnomalyService, ModelUnavailableError, get_anomaly_service
 from app.services.rag_service import ExplanationUnavailableError, RagService, get_rag_service
 from app.services.report_service import evaluate_report
+from app.services.public_distribution_service import compare_with_public_distribution
 
 
 router = APIRouter()
@@ -55,6 +60,17 @@ def create_analysis(
 def create_report_evaluation(request: ReportEvaluationRequest) -> ReportEvaluationResponse:
     """Classify position only, without interpreting health meaning or cause."""
     return evaluate_report(request)
+
+
+@router.post(
+    "/v1/public-distribution-comparisons",
+    response_model=PublicDistributionComparisonResponse,
+    summary="Compare values with a descriptive NHANES public-data band",
+)
+def create_public_distribution_comparison(
+    request: PublicDistributionComparisonRequest,
+) -> PublicDistributionComparisonResponse:
+    return compare_with_public_distribution(request)
 
 
 @router.post(

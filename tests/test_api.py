@@ -103,3 +103,16 @@ def test_report_evaluation_compares_only_with_the_supplied_interval() -> None:
     assert response.status_code == 200
     assert [item["position"] for item in response.json()["items"]] == ["within", "above"]
     assert "diagnostica" in response.json()["limitation"]
+
+
+def test_public_distribution_comparison_is_descriptive_not_clinical() -> None:
+    response = TestClient(app).post(
+        "/v1/public-distribution-comparisons",
+        json={"items": [{"feature_code": "LBXSATSI", "result": 58, "unit": "U/L"}]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["position"] == "above"
+    assert body["items"][0]["band_upper"] == 46.0
+    assert "não é intervalo clínico" in body["limitation"].lower()
