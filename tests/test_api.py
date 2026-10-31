@@ -75,3 +75,31 @@ def test_explanation_returns_grounded_answer_and_sources() -> None:
 def test_explanation_rejects_short_questions() -> None:
     response = TestClient(app).post("/v1/explanations", json={"question": "oi"})
     assert response.status_code == 422
+
+
+def test_report_evaluation_compares_only_with_the_supplied_interval() -> None:
+    response = TestClient(app).post(
+        "/v1/report-evaluations",
+        json={
+            "items": [
+                {
+                    "feature_code": "LBDSALSI",
+                    "result": 39,
+                    "unit": "g/L",
+                    "reference_lower": 35,
+                    "reference_upper": 50,
+                },
+                {
+                    "feature_code": "LBXSATSI",
+                    "result": 58,
+                    "unit": "U/L",
+                    "reference_lower": 7,
+                    "reference_upper": 45,
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert [item["position"] for item in response.json()["items"]] == ["within", "above"]
+    assert "diagnostica" in response.json()["limitation"]

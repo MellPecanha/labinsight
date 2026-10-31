@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.analysis import AnalysisResponse, LaboratoryPanel
 from app.schemas.explanation import ExplanationRequest, ExplanationResponse
+from app.schemas.report import ReportEvaluationRequest, ReportEvaluationResponse
 from app.services.anomaly_service import AnomalyService, ModelUnavailableError, get_anomaly_service
 from app.services.rag_service import ExplanationUnavailableError, RagService, get_rag_service
+from app.services.report_service import evaluate_report
 
 
 router = APIRouter()
@@ -43,6 +45,16 @@ def create_analysis(
 ) -> AnalysisResponse:
     """Return a statistical anomaly signal; never a clinical conclusion."""
     return service.analyze(panel)
+
+
+@router.post(
+    "/v1/report-evaluations",
+    response_model=ReportEvaluationResponse,
+    summary="Compare results with intervals supplied by a report",
+)
+def create_report_evaluation(request: ReportEvaluationRequest) -> ReportEvaluationResponse:
+    """Classify position only, without interpreting health meaning or cause."""
+    return evaluate_report(request)
 
 
 @router.post(
